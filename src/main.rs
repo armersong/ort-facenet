@@ -3,6 +3,7 @@ use ndarray::Array3;
 use ndarray::Axis;
 use ndarray::CowArray;
 use ort::Environment;
+use ort::Value;
 use std::path::Path;
 use std::sync::Arc;
 
