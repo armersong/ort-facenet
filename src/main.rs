@@ -16,11 +16,42 @@ fn load_and_preprocess_image(path: &str) -> Vec<f32> {
         let r = pixel[0] as f32 / 255.0;
         let g = pixel[1] as f32 / 255.0;
         let b = pixel[2] as f32 / 255.0;
+        // let r = pixel[0] as f32 / 127.5 - 1.0;
+        // let g = pixel[1] as f32 / 127.5 - 1.0;
+        // let b = pixel[2] as f32 / 127.5 - 1.0;
         input_data.push(r);
         input_data.push(g);
         input_data.push(b);
     }
     input_data
+}
+
+fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
+    // 检查两个向量的长度是否相同
+    assert_eq!(a.len(), b.len(), "向量长度必须相同");
+
+    let mut dot_product = 0.0;
+    let mut norm_a = 0.0;
+    let mut norm_b = 0.0;
+
+    // 计算点积和向量的模
+    for i in 0..a.len() {
+        dot_product += a[i] * b[i];
+        norm_a += a[i] * a[i];
+        norm_b += b[i] * b[i];
+    }
+
+    // 计算向量的模
+    norm_a = norm_a.sqrt();
+    norm_b = norm_b.sqrt();
+
+    // 避免除零错误
+    if norm_a == 0.0 || norm_b == 0.0 {
+        return 0.0;
+    }
+
+    // 计算余弦相似度
+    dot_product / (norm_a * norm_b)
 }
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -43,10 +74,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
         // 准备输入张量
         let image = Array3::<f32>::from_shape_vec((3, 160, 160), input_data)?.insert_axis(Axis(0));
+        println!("dim: {:?}, sharp: {:?}", image.dim(), image.shape());
 
         let binding = CowArray::from(image).into_dyn();
-        let input_tensor = Value::from_array(session.allocator(), &binding)?;
-
+        let input_tensor = Value::from_array(session.allocator(), &binding).unwrap();
         // 运行模型
         let outputs = session.run(vec![input_tensor])?;
         for (i, output) in outputs.iter().enumerate() {
@@ -66,7 +97,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 continue;
             }
             let distance = get_educlidean_distance(&faces[i], &faces[j]);
-            println!("{} vs {} distance:{}", i, j, distance);
+            let similarity = cosine_similarity(&faces[i], &faces[j]);
+            println!(
+                "{} vs {} distance:{}, similarity: {}",
+                i, j, distance, similarity
+            );
         }
     }
     Ok(())
@@ -77,7 +112,7 @@ fn get_educlidean_distance(src: &[f32], dst: &[f32]) -> f32 {
         src.len() == dst.len(),
         "src and dst must have the same length"
     );
-    assert!(src.len() == 128, "src and dst must 128 elements");
+    // assert!(src.len() == 128, "src and dst must 128 elements");
     let mut sum = 0.0;
     for i in 0..src.len() {
         sum += (src[i] - dst[i]) * (src[i] - dst[i]);
